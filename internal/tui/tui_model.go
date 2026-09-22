@@ -2,7 +2,7 @@ package tui
 
 import (
 	"database/sql"
-	"journal/internal/util"
+	"github.com/marcell-k/journal-tui/internal/util"
 	"time"
 )
 

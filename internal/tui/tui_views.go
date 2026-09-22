@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
-	"journal/internal/util"
+	"github.com/marcell-k/journal-tui/internal/util"
 	"math"
 	"strconv"
 	"strings"

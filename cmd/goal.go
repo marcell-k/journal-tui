@@ -3,7 +3,7 @@ package cmd
 import (
 	"database/sql"
 	"fmt"
-	"journal/internal/util"
+	"github.com/marcell-k/journal-tui/internal/util"
 	"strconv"
 	"strings"
 	"time"

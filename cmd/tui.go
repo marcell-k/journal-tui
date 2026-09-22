@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"journal/internal/tui"
+	"github.com/marcell-k/journal-tui/internal/tui"
 
 	"github.com/spf13/cobra"
 )

@@ -3,7 +3,7 @@ package tui
 import (
 	"fmt"
 	"github.com/charmbracelet/bubbletea"
-	"journal/internal/util"
+	"github.com/marcell-k/journal-tui/internal/util"
 	"strconv"
 	"strings"
 	"time"

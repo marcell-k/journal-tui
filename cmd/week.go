@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"journal/internal/util"
+	"github.com/marcell-k/journal-tui/internal/util"
 	"time"
 
 	"github.com/spf13/cobra"

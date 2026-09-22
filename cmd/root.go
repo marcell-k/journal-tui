@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"journal/internal/db"
+	"github.com/marcell-k/journal-tui/internal/db"
 
 	"github.com/spf13/cobra"
 )

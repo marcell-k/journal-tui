@@ -3,11 +3,11 @@ package cmd
 import (
 	"database/sql"
 	"fmt"
-	"journal/internal/util"
+	"github.com/marcell-k/journal-tui/internal/stats"
+	"github.com/marcell-k/journal-tui/internal/util"
 	"time"
 
 	"github.com/spf13/cobra"
-	"journal/internal/stats"
 )
 
 var metricsCmd = &cobra.Command{

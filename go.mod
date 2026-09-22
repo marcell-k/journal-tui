@@ -1,4 +1,4 @@
-module journal
+module github.com/marcell-k/journal-tui
 
 go 1.25.0
 

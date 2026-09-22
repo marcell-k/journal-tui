@@ -1,6 +1,6 @@
 package main
 
-import "journal/cmd"
+import "github.com/marcell-k/journal-tui/cmd"
 
 func main() {
 	cmd.Execute()
