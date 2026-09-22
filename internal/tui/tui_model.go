@@ -2,6 +2,7 @@ package tui
 
 import (
 	"database/sql"
+	"journal/internal/util"
 	"time"
 )
 
@@ -65,8 +66,8 @@ func newTUIModel() (tuiModel, error) {
 }
 
 func (m *tuiModel) reload() error {
-	weekStart := mondayOf(time.Now().In(displayLoc)).Format("2006-01-02")
-	rangeStart := mondayOf(time.Now().In(displayLoc)).AddDate(0, 0, -7*(weeksToShow-1)).Format("2006-01-02")
+	weekStart := util.MondayOf(time.Now().In(displayLoc)).Format("2006-01-02")
+	rangeStart := util.MondayOf(time.Now().In(displayLoc)).AddDate(0, 0, -7*(weeksToShow-1)).Format("2006-01-02")
 
 	blocks, err := loadTUIBlocks(rangeStart)
 	if err != nil {
@@ -240,13 +241,13 @@ func loadTUIBlocks(weekStart string) ([]tuiBlock, error) {
 		b.focus = focus
 		b.closed = closedAt != nil
 		b.length = "-"
-		if ct, err := parseTimestamp(createdAt); err == nil {
+		if ct, err := util.ParseTimestamp(createdAt); err == nil {
 			if closedAt != nil {
-				if ct2, err2 := parseTimestamp(*closedAt); err2 == nil {
-					b.length = formatDuration(ct2.Sub(ct))
+				if ct2, err2 := util.ParseTimestamp(*closedAt); err2 == nil {
+					b.length = util.FormatDuration(ct2.Sub(ct))
 				}
 			} else {
-				b.length = formatDuration(time.Since(ct))
+				b.length = util.FormatDuration(time.Since(ct))
 			}
 		}
 		out = append(out, b)
@@ -447,14 +448,14 @@ func loadBlockDetail(id int) (tuiBlockDetail, error) {
 	if project.Valid {
 		d.project = project.String
 	}
-	d.outcome = nullOr(outcome)
-	d.contextReload = nullOr(contextReload)
-	d.deliverable = nullOr(deliverable)
-	d.doneNotes = nullOr(doneNotes)
-	d.notDoneNotes = nullOr(notDoneNotes)
-	d.nextStep = nullOr(nextStep)
-	d.filesLinks = nullOr(filesLinks)
-	d.tweak = nullOr(tweak)
+	d.outcome = util.NullOr(outcome)
+	d.contextReload = util.NullOr(contextReload)
+	d.deliverable = util.NullOr(deliverable)
+	d.doneNotes = util.NullOr(doneNotes)
+	d.notDoneNotes = util.NullOr(notDoneNotes)
+	d.nextStep = util.NullOr(nextStep)
+	d.filesLinks = util.NullOr(filesLinks)
+	d.tweak = util.NullOr(tweak)
 	if focus.Valid {
 		f := focus.Float64
 		d.focus = &f
@@ -464,11 +465,4 @@ func loadBlockDetail(id int) (tuiBlockDetail, error) {
 		d.closedAt = &c
 	}
 	return d, nil
-}
-
-func nullOr(v sql.NullString) string {
-	if v.Valid && v.String != "" {
-		return v.String
-	}
-	return "-"
 }

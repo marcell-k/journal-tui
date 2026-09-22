@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss/table"
 	"github.com/guptarohit/asciigraph"
 	"journal/internal/stats"
+	"journal/internal/util"
 	"math"
 	"sort"
 	"strconv"
@@ -595,7 +596,7 @@ func (m tuiModel) viewBlockDetail() string {
 	header := fmt.Sprintf("Block #%d (id=%d) — %s (%s)", d.blockNum, d.id, dateOnly(d.date), d.day)
 	if d.closedAt != nil {
 		closedTime := *d.closedAt
-		if ct, err := parseTimestamp(*d.closedAt); err == nil {
+		if ct, err := util.ParseTimestamp(*d.closedAt); err == nil {
 			closedTime = ct.Format("15:04")
 		}
 		header += fmt.Sprintf(" — closed %s", closedTime)
@@ -624,7 +625,7 @@ func (m tuiModel) viewBlockDetail() string {
 	status := statusStyle("OPEN").Render("OPEN")
 	if d.closedAt != nil {
 		closedDisplay := *d.closedAt
-		if ct, err := parseTimestamp(*d.closedAt); err == nil {
+		if ct, err := util.ParseTimestamp(*d.closedAt); err == nil {
 			closedDisplay = ct.Format("2006-01-02 15:04")
 		}
 		status = statusStyle("CLOSED").Render("CLOSED") + " at " + closedDisplay
@@ -632,15 +633,15 @@ func (m tuiModel) viewBlockDetail() string {
 	row("Status", status)
 	durationStr := "-"
 	if d.closedAt != nil {
-		if ct, err1 := parseTimestamp(d.createdAt); err1 == nil {
-			if ct2, err2 := parseTimestamp(*d.closedAt); err2 == nil {
-				durationStr = formatDuration(ct2.Sub(ct))
+		if ct, err1 := util.ParseTimestamp(d.createdAt); err1 == nil {
+			if ct2, err2 := util.ParseTimestamp(*d.closedAt); err2 == nil {
+				durationStr = util.FormatDuration(ct2.Sub(ct))
 			}
 		}
 	}
 	row("Duration", durationStr)
 	createdDisplay := d.createdAt
-	if ct, err := parseTimestamp(d.createdAt); err == nil {
+	if ct, err := util.ParseTimestamp(d.createdAt); err == nil {
 		createdDisplay = ct.Format("2006-01-02 15:04")
 	}
 	row("Created", createdDisplay)

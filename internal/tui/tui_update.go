@@ -3,15 +3,11 @@ package tui
 import (
 	"fmt"
 	"github.com/charmbracelet/bubbletea"
+	"journal/internal/util"
 	"strconv"
 	"strings"
 	"time"
 )
-
-var validDays = map[string]string{
-	"mon": "Mon", "tue": "Tue", "wed": "Wed", "thu": "Thu",
-	"fri": "Fri", "sat": "Sat", "sun": "Sun",
-}
 
 // ---------- tea.Model ----------
 
@@ -126,7 +122,7 @@ func (m tuiModel) updateBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.sleepCur < len(m.sleep)-1 {
 				m.sleepCur++
 			} else if len(m.sleep) > 0 {
-				m.blockCur = 0
+				m.sleepCur = 0
 			}
 		case tabProjects, tabNotes:
 			if m.projectCur < len(m.projects)-1 {
@@ -705,15 +701,15 @@ func (m tuiModel) submitGoalAdd() (tea.Model, tea.Cmd) {
 
 	weekStart := m.f.ctxLabel
 	if weekStart == "" {
-		weekStart = mondayOf(time.Now().In(displayLoc)).Format("2006-01-02")
+		weekStart = util.MondayOf(time.Now().In(displayLoc)).Format("2006-01-02")
 	}
 
 	day := "Mon"
-	if weekStart == mondayOf(time.Now().In(displayLoc)).Format("2006-01-02") {
+	if weekStart == util.MondayOf(time.Now().In(displayLoc)).Format("2006-01-02") {
 		day = time.Now().In(displayLoc).Format("Mon")
 	}
 	if dayRaw != "" {
-		canonical, ok := validDays[strings.ToLower(dayRaw)]
+		canonical, ok := util.ValidDays[strings.ToLower(dayRaw)]
 		if !ok {
 			m.f.errMsg = "Day must be one of: mon tue wed thu fri sat sun."
 			return m, nil

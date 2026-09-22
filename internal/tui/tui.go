@@ -288,30 +288,3 @@ func Run(db *sql.DB) error {
 	_, err = p.Run()
 	return err
 }
-
-func parseTimestamp(s string) (time.Time, error) {
-	if t, err := time.Parse("2006-01-02 15:04:05", s); err == nil {
-		return t, nil
-	}
-	return time.Parse(time.RFC3339, s)
-}
-
-func formatDuration(d time.Duration) string {
-	if d < 0 {
-		d = -d
-	}
-	h := int(d.Hours())
-	m := int(d.Minutes()) % 60
-	if h > 0 {
-		return fmt.Sprintf("%dh %02dm", h, m)
-	}
-	return fmt.Sprintf("%dm", m)
-}
-
-func mondayOf(t time.Time) time.Time {
-	weekday := int(t.Weekday())
-	if weekday == 0 {
-		weekday = 7
-	}
-	return t.AddDate(0, 0, -(weekday - 1))
-}

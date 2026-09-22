@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
+	"journal/internal/util"
 	"math"
 	"strconv"
 	"strings"
@@ -107,13 +108,13 @@ func (m tuiModel) headerBar() string {
 	endsAt := ob.startedAt.Add(time.Duration(blockLenMins) * time.Minute)
 	remaining := endsAt.Sub(now)
 
-	elapsedStr := formatDuration(elapsed)
+	elapsedStr := util.FormatDuration(elapsed)
 
 	timerStyle := okStyle
 	statusWord := fmt.Sprintf("ends %s", endsAt.Format("15:04"))
 	if remaining < 0 {
 		timerStyle = errStyle
-		statusWord = fmt.Sprintf("over by %s", formatDuration(remaining))
+		statusWord = fmt.Sprintf("over by %s", util.FormatDuration(remaining))
 	}
 
 	status := timerStyle.Render(fmt.Sprintf("● Block #%d open (%s) — %s elapsed, %s — %s",

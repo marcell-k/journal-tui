@@ -3,17 +3,13 @@ package cmd
 import (
 	"database/sql"
 	"fmt"
+	"journal/internal/util"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
 )
-
-var validDays = map[string]string{
-	"mon": "Mon", "tue": "Tue", "wed": "Wed", "thu": "Thu",
-	"fri": "Fri", "sat": "Sat", "sun": "Sun",
-}
 
 var goalDay string
 
@@ -27,12 +23,12 @@ var goalAddCmd = &cobra.Command{
 	Short: "Add a goal for this week (defaults to today)",
 	Args:  cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
-		weekStart := mondayOf(time.Now()).Format("2006-01-02")
+		weekStart := util.MondayOf(time.Now()).Format("2006-01-02")
 		goal := strings.Join(args, " ")
 
 		day := time.Now().Format("Mon")
 		if goalDay != "" {
-			canonical, ok := validDays[strings.ToLower(goalDay)]
+			canonical, ok := util.ValidDays[strings.ToLower(goalDay)]
 			if !ok {
 				return fmt.Errorf("invalid day %q — use one of: mon tue wed thu fri sat sun", goalDay)
 			}
@@ -135,7 +131,7 @@ var goalDeleteCmd = &cobra.Command{
 // goalIDForNumber resolves a 'journal goal list' display number (1-based, in
 // list order) to the underlying DB id, for the current week.
 func goalIDForNumber(n int) (int, error) {
-	weekStart := mondayOf(time.Now()).Format("2006-01-02")
+	weekStart := util.MondayOf(time.Now()).Format("2006-01-02")
 	var id int
 	err := conn.QueryRow(
 		`SELECT id FROM weekly_goals WHERE week_start = ? ORDER BY COALESCE(sort_order, id) LIMIT 1 OFFSET ?`,
@@ -152,7 +148,7 @@ func goalIDForNumber(n int) (int, error) {
 
 // printWeekGoals is shared by 'goal list' and 'week' so numbering always matches.
 func printWeekGoals(conn *sql.DB) error {
-	weekStart := mondayOf(time.Now()).Format("2006-01-02")
+	weekStart := util.MondayOf(time.Now()).Format("2006-01-02")
 	rows, err := conn.Query(
 		`SELECT day, goal, done FROM weekly_goals WHERE week_start = ? ORDER BY COALESCE(sort_order, id)`,
 		weekStart,

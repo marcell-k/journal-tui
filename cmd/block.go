@@ -3,6 +3,7 @@ package cmd
 import (
 	"database/sql"
 	"fmt"
+	"journal/internal/util"
 	"strconv"
 	"time"
 
@@ -108,9 +109,9 @@ var blockForCmd = &cobra.Command{
 			}
 			lengthStr := "-"
 			if closedAt.Valid {
-				if ct, err1 := parseTimestamp(createdAt); err1 == nil {
-					if ct2, err2 := parseTimestamp(closedAt.String); err2 == nil {
-						lengthStr = formatDuration(ct2.Sub(ct))
+				if ct, err1 := util.ParseTimestamp(createdAt); err1 == nil {
+					if ct2, err2 := util.ParseTimestamp(closedAt.String); err2 == nil {
+						lengthStr = util.FormatDuration(ct2.Sub(ct))
 					}
 				}
 			}
@@ -188,9 +189,9 @@ var blockListCmd = &cobra.Command{
 			}
 			lengthStr := "-"
 			if closedAt.Valid {
-				if ct, err1 := parseTimestamp(createdAt); err1 == nil {
-					if ct2, err2 := parseTimestamp(closedAt.String); err2 == nil {
-						lengthStr = formatDuration(ct2.Sub(ct))
+				if ct, err1 := util.ParseTimestamp(createdAt); err1 == nil {
+					if ct2, err2 := util.ParseTimestamp(closedAt.String); err2 == nil {
+						lengthStr = util.FormatDuration(ct2.Sub(ct))
 					}
 				}
 			}
@@ -243,11 +244,7 @@ var blockShowCmd = &cobra.Command{
 		}
 
 		printField := func(label string, v sql.NullString) {
-			val := "-"
-			if v.Valid && v.String != "" {
-				val = v.String
-			}
-			fmt.Printf("%-16s %s\n", label+":", val)
+			fmt.Printf("%-16s %s\n", label+":", util.NullOr(v))
 		}
 
 		projName := "-"
@@ -257,8 +254,8 @@ var blockShowCmd = &cobra.Command{
 
 		fmt.Printf("Block #%d (id=%d) — %s (%s)\n", blockNum, id, date, day)
 		fmt.Printf("%-16s %s\n", "Project:", projName)
-		fmt.Printf("%-16s %s\n", "Outcome:", nullOr(outcome))
-		fmt.Printf("%-16s %s\n", "Context reload:", nullOr(contextReload))
+		fmt.Printf("%-16s %s\n", "Outcome:", util.NullOr(outcome))
+		fmt.Printf("%-16s %s\n", "Context reload:", util.NullOr(contextReload))
 		printField("Deliverable", deliverable)
 		printField("Done", doneNotes)
 		printField("Not done", notDoneNotes)
@@ -273,23 +270,23 @@ var blockShowCmd = &cobra.Command{
 		status := "open"
 		if closedAt.Valid {
 			closedDisplay := closedAt.String
-			if ct, err := parseTimestamp(closedAt.String); err == nil {
+			if ct, err := util.ParseTimestamp(closedAt.String); err == nil {
 				closedDisplay = ct.Format("2006-01-02 15:04")
 			}
 			status = "closed at " + closedDisplay
 		}
 		durationStr := "-"
 		if closedAt.Valid {
-			ct, err1 := parseTimestamp(createdAt)
-			ct2, err2 := parseTimestamp(closedAt.String)
+			ct, err1 := util.ParseTimestamp(createdAt)
+			ct2, err2 := util.ParseTimestamp(closedAt.String)
 			if err1 == nil && err2 == nil {
-				durationStr = formatDuration(ct2.Sub(ct))
+				durationStr = util.FormatDuration(ct2.Sub(ct))
 			}
 		}
 		fmt.Printf("%-16s %s\n", "Duration:", durationStr)
 		fmt.Printf("%-16s %s\n", "Status:", status)
 		createdDisplay := createdAt
-		if ct, err := parseTimestamp(createdAt); err == nil {
+		if ct, err := util.ParseTimestamp(createdAt); err == nil {
 			createdDisplay = ct.Format("2006-01-02 15:04")
 		}
 		fmt.Printf("%-16s %s\n", "Created:", createdDisplay)
@@ -304,11 +301,4 @@ func init() {
 
 	blockCmd.AddCommand(blockListCmd, blockShowCmd, blockReassignCmd, blockForCmd)
 	rootCmd.AddCommand(blockCmd)
-}
-
-func nullOr(v sql.NullString) string {
-	if v.Valid && v.String != "" {
-		return v.String
-	}
-	return "-"
 }

@@ -3,6 +3,7 @@ package cmd
 import (
 	"database/sql"
 	"fmt"
+	"journal/internal/util"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -18,7 +19,7 @@ var metricsWeekCmd = &cobra.Command{
 	Use:   "week",
 	Short: "Show this week's block/focus stats by project",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		weekStart := mondayOf(time.Now()).Format("2006-01-02")
+		weekStart := util.MondayOf(time.Now()).Format("2006-01-02")
 		rows, err := conn.Query(`
 			SELECT p.name, COUNT(*), AVG(b.focus_quality)
 			FROM blocks b JOIN projects p ON p.id = b.project_id
@@ -47,7 +48,7 @@ var metricsSleepCmd = &cobra.Command{
 	Use:   "sleep",
 	Short: "Show sleep/feel daily log and weekly averages",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		weekStart := mondayOf(time.Now()).Format("2006-01-02")
+		weekStart := util.MondayOf(time.Now()).Format("2006-01-02")
 
 		rows, err := conn.Query(
 			`SELECT date, sleep_hours, sleep_quality, feel, water_intake

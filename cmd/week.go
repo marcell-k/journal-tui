@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"journal/internal/util"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -11,7 +12,7 @@ var weekCmd = &cobra.Command{
 	Use:   "week",
 	Short: "Show current week's goals and blocks",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		weekStart := mondayOf(time.Now()).Format("2006-01-02")
+		weekStart := util.MondayOf(time.Now()).Format("2006-01-02")
 
 		fmt.Println("=== Weekly Goals ===")
 		if err := printWeekGoals(conn); err != nil {
@@ -50,15 +51,6 @@ var weekCmd = &cobra.Command{
 
 		return nil
 	},
-}
-
-// mondayOf returns the Monday of the week containing t.
-func mondayOf(t time.Time) time.Time {
-	weekday := int(t.Weekday())
-	if weekday == 0 { // Sunday
-		weekday = 7
-	}
-	return t.AddDate(0, 0, -(weekday - 1))
 }
 
 func init() {
