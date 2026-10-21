@@ -20,7 +20,6 @@ const (
 	tabGoals
 	tabSleep
 	tabProjects
-	tabNotes
 	tabMetrics
 	tabCount
 )
@@ -29,8 +28,9 @@ const weeksToShow = 3
 const trendDaysToShow = weeksToShow * 7
 
 const notesDir = "notes"
+const notePreviewLines = 15
 
-var tabNames = [tabCount]string{"Blocks", "Goals", "Wellness", "Projects", "Notes", "Metrics"}
+var tabNames = [tabCount]string{"Blocks", "Goals", "Wellness", "Projects", "Metrics"}
 
 type notesEditorMsg struct{ err error }
 

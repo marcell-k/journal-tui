@@ -2,13 +2,16 @@ package tui
 
 import (
 	"fmt"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/table"
-	"github.com/marcell-k/journal-tui/internal/util"
 	"math"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
+	"github.com/marcell-k/journal-tui/internal/util"
 )
 
 // ---------- View ----------
@@ -48,8 +51,6 @@ func (m tuiModel) View() string {
 			b.WriteString(m.viewSleep())
 		case tabProjects:
 			b.WriteString(m.viewProjects())
-		case tabNotes:
-			b.WriteString(m.viewNotes())
 		case tabMetrics:
 			b.WriteString(m.viewMetrics())
 		}
@@ -66,32 +67,6 @@ func (m tuiModel) View() string {
 	}
 	b.WriteString(dimStyle.Render(m.helpLine()))
 
-	return b.String()
-}
-
-func (m tuiModel) viewNotes() string {
-	if len(m.projects) == 0 {
-		return headerStyle.Render("=== Notes ===") + "\n" + dimStyle.Render("No projects yet — switch to Projects tab and press n to add one.")
-	}
-
-	var b strings.Builder
-	b.WriteString(headerStyle.Render("=== Notes ==="))
-	b.WriteString("\n")
-
-	for i, p := range m.projects {
-		marker := "○"
-		if hasNotes(p.id) {
-			marker = "●"
-		}
-		line := fmt.Sprintf("%s %s", marker, p.name)
-		if i == m.projectCur {
-			b.WriteString(cursorStyle.Render("> " + line))
-		} else {
-			b.WriteString("  ")
-			b.WriteString(line)
-		}
-		b.WriteString("\n")
-	}
 	return b.String()
 }
 
@@ -136,17 +111,15 @@ func (m tuiModel) helpLine() string {
 	}
 	switch m.tab {
 	case tabBlocks:
-		return "tab: switch section  •  ↑↓/jk: move  •  enter: view block  •  n: new  •  s: log shallow  •  u: update  •  c: close  •  d: delete  •  r: reload  •  q: quit"
+		return "ctrl+n/b: switch section  •  ↑↓/jk: move  •  enter: view block  •  n: new  •  s: log shallow  •  u: update  •  c: close  •  d: delete  •  r: reload  •  q: quit"
 	case tabGoals:
-		return "tab: switch section  •  ↑↓/jk: move  •  ctrl+j/k: reorder  •  n: new  •  u: update  •  d: delete  •  enter/space: toggle done  •  r: reload  •  q: quit"
+		return "ctrl+n/b: switch section  •  ↑↓/jk: move  •  ctrl+j/k: reorder  •  n: new  •  u: update  •  d: delete  •  enter/space: toggle done  •  r: reload  •  q: quit"
 	case tabSleep:
-		return "tab: switch section  •  ↑↓/jk: move  •  n: new  •  u: update  •  d: delete  •  r: reload  •  q: quit"
+		return "ctrl+n/b: switch section  •  ↑↓/jk: move  •  n: new  •  u: update  •  d: delete  •  r: reload  •  q: quit"
 	case tabProjects:
-		return "tab: switch section  •  ↑↓/jk: move  •  n: new  •  u: rename  •  d: delete  •  r: reload  •  q: quit"
-	case tabNotes:
-		return "tab: switch section  •  ↑↓/jk: move  •  enter: edit in nvim  •  q: quit"
+		return "ctrl+n/b: switch section  •  ↑↓/jk: move  •  enter: edit notes in nvim  •  n: new  •  u: rename  •  d: delete  •  r: reload  •  q: quit"
 	default:
-		return "tab: switch section  •  r: reload  •  q: quit"
+		return "ctrl+n/b: switch section  •  r: reload  •  q: quit"
 	}
 }
 
@@ -190,6 +163,9 @@ func (m tuiModel) viewBlocks() string {
 		Headers("#", "Date", "Type", "Status", "Project", "Length", "Focus", "Outcome").
 		StyleFunc(func(row, col int) lipgloss.Style {
 			if row == table.HeaderRow {
+				if col == 5 || col == 6 { // Length, Focus
+					return tableHeaderStyle.Align(lipgloss.Right)
+				}
 				return tableHeaderStyle
 			}
 			blk := m.blocks[row]
@@ -209,6 +185,11 @@ func (m tuiModel) viewBlocks() string {
 					status = "OPEN"
 				}
 				return statusStyle(status).Padding(0, 1).Align(lipgloss.Center)
+			case 5: // Length
+				if selected {
+					return rowSelectedStyle.Align(lipgloss.Right)
+				}
+				return tableCellStyle.Align(lipgloss.Right)
 			case 6: // Focus
 				if selected {
 					return rowSelectedStyle.Align(lipgloss.Right)
@@ -416,7 +397,11 @@ func (m tuiModel) viewProjects() string {
 	b.WriteString("\n")
 
 	for i, p := range m.projects {
-		line := fmt.Sprintf("%d) %s", p.id, p.name)
+		marker := "○"
+		if hasNotes(p.id) {
+			marker = "●"
+		}
+		line := fmt.Sprintf("%s %d) %s", marker, p.id, p.name)
 		if i == m.projectCur {
 			b.WriteString(cursorStyle.Render("> " + line))
 		} else {
@@ -425,6 +410,16 @@ func (m tuiModel) viewProjects() string {
 		}
 		b.WriteString("\n")
 	}
+	sel := m.projects[m.projectCur]
+	b.WriteString("\n")
+	b.WriteString(headerStyle.Render(fmt.Sprintf("=== Notes: %s ===", sel.name)))
+	b.WriteString("\n")
+	if notes, ok := readNotes(sel.id, notePreviewLines); ok {
+		b.WriteString(notes)
+	} else {
+		b.WriteString(dimStyle.Render("No notes yet — press enter to write some."))
+	}
+	b.WriteString("\n")
 	return b.String()
 }
 
@@ -494,4 +489,17 @@ func (m tuiModel) viewConfirmDelete() string {
 	b.WriteString(errStyle.Render(fmt.Sprintf("Delete %s? This cannot be undone.", m.pendingDelete.label)))
 	b.WriteString("\n")
 	return b.String()
+}
+
+func readNotes(projectID, maxLines int) (string, bool) {
+	path := filepath.Join(notesDir, fmt.Sprintf("%d.md", projectID))
+	data, err := os.ReadFile(path)
+	if err != nil || strings.TrimSpace(string(data)) == "" {
+		return "", false
+	}
+	lines := strings.Split(strings.TrimRight(string(data), "\n"), "\n")
+	if len(lines) > maxLines {
+		lines = append(lines[:maxLines], "…")
+	}
+	return strings.Join(lines, "\n"), true
 }

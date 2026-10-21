@@ -53,10 +53,10 @@ func (m tuiModel) updateBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+c", "q":
 		return m, tea.Quit
 
-	case "tab":
+	case "ctrl+n":
 		m.tab = (m.tab + 1) % tabCount
 		return m, nil
-	case "shift+tab":
+	case "ctrl+b":
 		m.tab = (m.tab - 1 + tabCount) % tabCount
 		return m, nil
 	case "ctrl+j":
@@ -99,7 +99,7 @@ func (m tuiModel) updateBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			} else if len(m.sleep) > 0 {
 				m.sleepCur = len(m.sleep) - 1
 			}
-		case tabProjects, tabNotes:
+		case tabProjects:
 			if m.projectCur > 0 {
 				m.projectCur--
 			} else if len(m.projects) > 0 {
@@ -124,7 +124,7 @@ func (m tuiModel) updateBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			} else if len(m.sleep) > 0 {
 				m.sleepCur = 0
 			}
-		case tabProjects, tabNotes:
+		case tabProjects:
 			if m.projectCur < len(m.projects)-1 {
 				m.projectCur++
 			} else if len(m.projects) > 0 {
@@ -364,7 +364,7 @@ func (m tuiModel) updateBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					m.mode = "block_detail"
 				}
 			}
-		case tabNotes:
+		case tabProjects:
 			if msg.String() == "enter" && len(m.projects) > 0 {
 				p := m.projects[m.projectCur]
 				return m, openNoteEditor(p.id)
