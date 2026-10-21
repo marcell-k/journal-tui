@@ -205,6 +205,7 @@ type tuiSleep struct {
 	quality, feel float64
 	water         float64
 	hasWater      bool
+	missing       bool // placeholder for a day with no check-in (view only)
 }
 
 type tuiMetric struct {

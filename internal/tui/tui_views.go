@@ -329,23 +329,29 @@ func (m tuiModel) viewSleep() string {
 		b.WriteString(dimStyle.Render("No checkins logged this week — press n to add one."))
 		return b.String()
 	}
+
+	rows, curRow := m.sleepRows()
+
 	t := table.New().
 		Border(lipgloss.RoundedBorder()).
 		BorderStyle(tableBorderStyle).
-		Headers("", "Date", "Sleep", "Quality", "Feel", "Water", "Day").
+		Headers("  Date", "Sleep", "Quality", "Feel", "Water").
 		StyleFunc(func(row, col int) lipgloss.Style {
 			if row == table.HeaderRow {
 				return tableHeaderStyle
 			}
-			s := m.sleep[row]
-			selected := row == m.sleepCur
+			s := rows[row]
+			if s.missing {
+				return dimStyle.Padding(0, 1)
+			}
+			selected := row == curRow
 			switch col {
-			case 3: // Quality
+			case 2: // Quality
 				if selected {
 					return rowSelectedStyle
 				}
 				return focusStyle(s.quality)
-			case 4: // Feel
+			case 3: // Feel
 				if selected {
 					return rowSelectedStyle
 				}
@@ -361,10 +367,15 @@ func (m tuiModel) viewSleep() string {
 	var sumHours, sumWater float64
 	var sumQuality, sumFeel float64
 	var waterN int
-	for i, s := range m.sleep {
+	for i, s := range rows {
 		marker := " "
-		if i == m.sleepCur {
+		if i == curRow {
 			marker = "▶"
+		}
+		dateCell := fmt.Sprintf("%s %s %s", marker, s.date, s.weekday)
+		if s.missing {
+			t.Row(dateCell, "-", "-", "-", "-")
+			continue
 		}
 		waterStr := "-"
 		if s.hasWater {
@@ -372,23 +383,59 @@ func (m tuiModel) viewSleep() string {
 			sumWater += s.water
 			waterN++
 		}
-		t.Row(marker, s.date, fmt.Sprintf("%.1fh", s.hours), strconv.FormatFloat(s.quality, 'f', 1, 64), strconv.FormatFloat(s.feel, 'f', 1, 64), waterStr, s.weekday)
+		t.Row(dateCell, fmt.Sprintf("%.1fh", s.hours), strconv.FormatFloat(s.quality, 'f', 1, 64), strconv.FormatFloat(s.feel, 'f', 1, 64), waterStr)
 
 		sumHours += s.hours
 		sumQuality += s.quality
 		sumFeel += s.feel
 	}
-	b.WriteString(t.Render())
-	b.WriteString("\n")
 	n := float64(len(m.sleep))
 	avgWaterStr := "-"
 	if waterN > 0 {
 		avgWaterStr = fmt.Sprintf("%.1fL", sumWater/float64(waterN))
 	}
-	fmt.Fprintf(&b, "\nAvg sleep: %.1fh | Avg quality: %.1f | Avg feel: %.1f | Avg water: %s\n",
-		sumHours/n, sumQuality/n, sumFeel/n, avgWaterStr)
+	b.WriteString(t.Render())
+	b.WriteString("\n")
+	b.WriteString(dimStyle.Render(fmt.Sprintf(
+		"avg sleep %.1fh  •  quality %.1f  •  feel %.1f  •  water %s  •  %d days (last %d weeks)",
+		sumHours/n, sumQuality/n, sumFeel/n, avgWaterStr, len(m.sleep), weeksToShow,
+	)))
+	b.WriteString("\n")
 
 	return b.String()
+}
+
+func (m tuiModel) sleepRows() (rows []tuiSleep, curRow int) {
+	const layout = "2006-01-02"
+	now := time.Now().In(displayLoc)
+
+	top := now.Format(layout)
+	if len(m.sleep) > 0 && m.sleep[0].date > top {
+		top = m.sleep[0].date // a check-in logged for a future day
+	}
+	bottom := util.MondayOf(now).AddDate(0, 0, -7*(weeksToShow-1)).Format(layout)
+
+	logged := make(map[string]int, len(m.sleep))
+	for i, s := range m.sleep {
+		logged[s.date] = i
+	}
+
+	d, err := time.Parse(layout, top)
+	if err != nil {
+		return m.sleep, m.sleepCur
+	}
+	for ; d.Format(layout) >= bottom; d = d.AddDate(0, 0, -1) {
+		ds := d.Format(layout)
+		if i, ok := logged[ds]; ok {
+			if i == m.sleepCur {
+				curRow = len(rows)
+			}
+			rows = append(rows, m.sleep[i])
+		} else {
+			rows = append(rows, tuiSleep{date: ds, weekday: d.Format("Mon"), missing: true})
+		}
+	}
+	return rows, curRow
 }
 
 func (m tuiModel) viewProjects() string {
