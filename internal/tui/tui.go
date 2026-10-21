@@ -3,6 +3,7 @@ package tui
 import (
 	"database/sql"
 	"fmt"
+	"hash/fnv"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -76,6 +77,28 @@ var (
 	errStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#e46876"))
 	okStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#87a987"))
 )
+
+// ---------- per-project colors ----------
+
+var projectPalette = []lipgloss.Color{
+	"#c4746e", // 1  muted red
+	"#8a9a7b", // 2  muted green
+	"#c4b28a", // 3  sand
+	"#8ba4b0", // 4  steel blue
+	"#a292a3", // 5  mauve
+	"#8ea4a2", // 6  grey teal
+	"#7fb4ca", // 12 bright blue
+	"#938aa9", // 13 violet
+}
+
+func projectStyle(name string) lipgloss.Style {
+	if name == "" || name == "-" {
+		return dimStyle
+	}
+	h := fnv.New32a()
+	h.Write([]byte(name))
+	return lipgloss.NewStyle().Foreground(projectPalette[h.Sum32()%uint32(len(projectPalette))])
+}
 
 // ---------- block-type ----------
 func typeGlyph(blockType string) string {

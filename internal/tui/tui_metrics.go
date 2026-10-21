@@ -291,7 +291,8 @@ func (m tuiModel) viewMetrics() string {
 		b.WriteString(dimStyle.Render("No blocks logged this week."))
 	} else {
 		for _, mt := range m.metrics {
-			fmt.Fprintf(&b, "  %-15s blocks:%-3d avg focus:%.1f\n", mt.project, mt.count, mt.avgFocus)
+			name := projectStyle(mt.project).Render(fmt.Sprintf("%-15s", mt.project))
+			fmt.Fprintf(&b, "  %s blocks:%-3d avg focus:%.1f\n", name, mt.count, mt.avgFocus)
 		}
 	}
 

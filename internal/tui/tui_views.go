@@ -56,18 +56,26 @@ func (m tuiModel) View() string {
 		}
 	}
 
-	b.WriteString("\n")
+	body := b.String()
+
+	var f strings.Builder
 	if m.err != nil {
-		b.WriteString(errStyle.Render("Error: " + m.err.Error()))
-		b.WriteString("\n")
+		f.WriteString(errStyle.Render("Error: " + m.err.Error()))
+		f.WriteString("\n")
 	}
 	if m.status != "" {
-		b.WriteString(okStyle.Render(m.status))
-		b.WriteString("\n")
+		f.WriteString(okStyle.Render(m.status))
+		f.WriteString("\n")
 	}
-	b.WriteString(dimStyle.Render(m.helpLine()))
+	f.WriteString(dimStyle.Render(m.helpLine()))
+	footer := f.String()
 
-	return b.String()
+	// Pad so the footer lands on the last row
+	pad := m.height - lipgloss.Height(body) - lipgloss.Height(footer) + 1
+	if pad < 1 {
+		pad = 1 // content taller than the window: keep one separator line
+	}
+	return body + strings.Repeat("\n", pad) + footer
 }
 
 func (m tuiModel) headerBar() string {
@@ -92,10 +100,10 @@ func (m tuiModel) headerBar() string {
 		statusWord = fmt.Sprintf("over by %s", util.FormatDuration(remaining))
 	}
 
-	status := timerStyle.Render(fmt.Sprintf("● Block #%d open (%s) — %s elapsed, %s — %s",
-		ob.blockNum, ob.project, elapsedStr, statusWord, ob.outcome))
-
-	return status
+	return timerStyle.Render(fmt.Sprintf("● Block #%d open (", ob.blockNum)) +
+		projectStyle(ob.project).Bold(true).Render(ob.project) +
+		timerStyle.Render(fmt.Sprintf(") — %s elapsed, %s — %s",
+			elapsedStr, statusWord, ob.outcome))
 }
 
 func (m tuiModel) helpLine() string {
@@ -185,6 +193,11 @@ func (m tuiModel) viewBlocks() string {
 					status = "OPEN"
 				}
 				return statusStyle(status).Padding(0, 1).Align(lipgloss.Center)
+			case 4: // Project
+				if selected {
+					return rowSelectedStyle
+				}
+				return projectStyle(blk.project).Padding(0, 1)
 			case 5: // Length
 				if selected {
 					return rowSelectedStyle.Align(lipgloss.Right)
