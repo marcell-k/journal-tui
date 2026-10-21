@@ -166,10 +166,10 @@ func (m tuiModel) viewBlocks() string {
 	t := table.New().
 		Border(lipgloss.RoundedBorder()).
 		BorderStyle(tableBorderStyle).
-		Headers("#", "Date", "Type", "Project", "Length", "Focus", "Outcome").
+		Headers(fmt.Sprintf("  %-10s %2s", "Date", "#"), "Type", "Project", "Length", "Focus", "Outcome").
 		StyleFunc(func(row, col int) lipgloss.Style {
 			if row == table.HeaderRow {
-				if col == 4 || col == 5 { // Length, Focus
+				if col == 3 || col == 4 { // Length, Focus
 					return tableHeaderStyle.Align(lipgloss.Right)
 				}
 				return tableHeaderStyle
@@ -177,17 +177,17 @@ func (m tuiModel) viewBlocks() string {
 			blk := m.blocks[row]
 			selected := row == m.blockCur
 			switch col {
-			case 2: // Type
+			case 1: // Type
 				if selected {
 					return rowSelectedStyle.Align(lipgloss.Center)
 				}
 				return tableCellStyle.Align(lipgloss.Center)
-			case 3: // Project
+			case 2: // Project
 				if selected {
 					return rowSelectedStyle
 				}
 				return projectStyle(blk.project).Padding(0, 1)
-			case 4: // Length
+			case 3: // Length
 				if selected {
 					return rowSelectedStyle.Align(lipgloss.Right)
 				}
@@ -195,7 +195,7 @@ func (m tuiModel) viewBlocks() string {
 					return okStyle.Padding(0, 1).Align(lipgloss.Right)
 				}
 				return tableCellStyle.Align(lipgloss.Right)
-			case 5: // Focus
+			case 4: // Focus
 				if selected {
 					return rowSelectedStyle.Align(lipgloss.Right)
 				}
@@ -216,12 +216,17 @@ func (m tuiModel) viewBlocks() string {
 		if i == m.blockCur {
 			marker = "▶"
 		}
-		idStr := fmt.Sprintf("%s%*d", marker, 3, blk.blockNum)
+		// Show the date only on the first row of each day.
+		d := dateOnly(blk.date)
+		if i > 0 && dateOnly(m.blocks[i-1].date) == d {
+			d = ""
+		}
+		dateNum := fmt.Sprintf("%s %-10s %2d", marker, d, blk.blockNum)
 		focus := "-"
 		if blk.focus != nil {
 			focus = formatFocus(*blk.focus)
 		}
-		t.Row(idStr, dateOnly(blk.date), typeGlyph(blk.blockType), truncate(blk.project, clampColWidth), truncate(blk.length, clampColWidth), truncate(focus, clampColWidth), truncate(blk.outcome, outcomeColWidth))
+		t.Row(dateNum, typeGlyph(blk.blockType), truncate(blk.project, clampColWidth), truncate(blk.length, clampColWidth), truncate(focus, clampColWidth), truncate(blk.outcome, outcomeColWidth))
 	}
 
 	b.WriteString(t.Render())
