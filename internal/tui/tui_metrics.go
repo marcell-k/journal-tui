@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/lipgloss/table"
 	"github.com/guptarohit/asciigraph"
 	"github.com/marcell-k/journal-tui/internal/stats"
 	"github.com/marcell-k/journal-tui/internal/util"
@@ -19,6 +18,8 @@ import (
 type tuiCorrelation struct {
 	pairedDays              int
 	rHours, rQuality, rFeel float64
+	hours, quality, feel    []float64
+	focus                   []float64
 }
 
 func loadTUICorrelation() (tuiCorrelation, error) {
@@ -49,7 +50,10 @@ func loadTUICorrelation() (tuiCorrelation, error) {
 		return tuiCorrelation{}, err
 	}
 
-	c := tuiCorrelation{pairedDays: len(hours)}
+	c := tuiCorrelation{
+		pairedDays: len(hours),
+		hours:      hours, quality: quality, feel: feel, focus: focus,
+	}
 	if len(hours) >= 3 {
 		c.rHours = stats.Pearson(hours, focus)
 		c.rQuality = stats.Pearson(quality, focus)
@@ -181,23 +185,228 @@ func toPlotSeries(values []float64, has []bool) []float64 {
 	return out
 }
 
-func weekDayAxis(graph string, numDays int) string {
-	firstLine := graph
-	if first, _, ok := strings.Cut(graph, "\n"); ok {
-		firstLine = first
+var (
+	subHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(colBlue)
+	trendStyle     = lipgloss.NewStyle().Foreground(colBlue)
+
+	mutedGoodStyle = lipgloss.NewStyle().Foreground(colSoftGreen)
+	mutedMidStyle  = lipgloss.NewStyle().Foreground(colSoftGold)
+	mutedBadStyle  = lipgloss.NewStyle().Foreground(colSoftRed)
+)
+
+func mutedFocus(n float64) lipgloss.Style {
+	switch {
+	case n <= 0:
+		return dimStyle
+	case n <= 3:
+		return mutedBadStyle
+	case n <= 7:
+		return mutedMidStyle
+	default:
+		return mutedGoodStyle
 	}
-	margin := strings.IndexRune(firstLine, '┤')
-	if margin < 0 {
-		margin = 0
+}
+
+// barTrack draws a filled bar plus a dim track so the scale is visible.
+func barTrack(value, top float64, width int, st lipgloss.Style) string {
+	w := 0
+	if top > 0 {
+		w = int(math.Round(value / top * float64(width)))
+	}
+	w = min(max(w, 0), width)
+	return st.Render(strings.Repeat("■", w)) + tableBorderStyle.Render(strings.Repeat("·", width-w))
+}
+
+// weekDayAxis prints one letter per day under a plot, today highlighted.
+func weekDayAxis(graph string, numDays, perDay int) string {
+	firstLine, _, _ := strings.Cut(graph, "\n")
+	margin := 0
+	// The axis glyph is ┤ normally, but ┼ when the line touches the axis.
+	if i := strings.IndexAny(firstLine, "┤┼"); i >= 0 {
+		margin = i + 1
+	}
+	letters := []string{"M", "T", "W", "T", "F", "S", "S"}
+	today := numDays - 7 + todayDayIndex()
+	sep := strings.Repeat(" ", perDay-1)
+
+	var b strings.Builder
+	b.WriteString(strings.Repeat(" ", margin))
+	for i := 0; i < numDays; i++ {
+		if i == today {
+			b.WriteString(cursorStyle.Bold(true).Render(letters[i%7]))
+		} else {
+			b.WriteString(dimStyle.Render(letters[i%7]))
+		}
+		if i < numDays-1 {
+			b.WriteString(sep)
+		}
+	}
+	return b.String()
+}
+
+func trendPlot(title string, values []float64, has []bool, style lipgloss.Style, perDay int) string {
+	var sum float64
+	n := 0
+	for i, v := range values {
+		if has[i] {
+			sum += v
+			n++
+		}
+	}
+	head := style.Bold(true).Render(title)
+	if n == 0 {
+		return head + "\n" + dimStyle.Render("no data yet")
+	}
+	head += dimStyle.Render(fmt.Sprintf("  avg %.1f", sum/float64(n)))
+
+	graph := asciigraph.Plot(
+		toPlotSeries(values, has),
+		asciigraph.Height(5),
+		asciigraph.Width(len(values)*perDay),
+		asciigraph.Precision(1),
+	)
+	return head + "\n" + style.Render(graph) + "\n" + weekDayAxis(graph, len(values), perDay)
+}
+
+func (m tuiModel) blockPosSection() string {
+	const slots = 5
+	byNum := make(map[int]tuiBlockPosStat, len(m.blockPosStats))
+	for _, s := range m.blockPosStats {
+		byNum[s.num] = s
+	}
+	var b strings.Builder
+	b.WriteString(subHeaderStyle.Render("By block #"))
+	b.WriteString("\n")
+	for n := 1; n <= slots; n++ {
+		s, ok := byNum[n]
+		avg, avgStr, st := 0.0, "-", dimStyle
+		if ok {
+			avg = s.avg
+			avgStr = fmt.Sprintf("%.1f", s.avg)
+			st = mutedFocus(s.avg)
+		}
+		fmt.Fprintf(&b, "#%-3d %s %4s  %s\n", n,
+			barTrack(avg, 10, 10, st), avgStr, dimStyle.Render(fmt.Sprintf("n=%d", s.count)))
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func (m tuiModel) startTimeSection() string {
+	var b strings.Builder
+	b.WriteString(subHeaderStyle.Render("By start time"))
+	b.WriteString("\n")
+	for _, s := range m.startTimeStats {
+		avg, avgStr, st := 0.0, "-", dimStyle
+		if s.count > 0 {
+			avg = s.sum / float64(s.count)
+			avgStr = fmt.Sprintf("%.1f", avg)
+			st = mutedFocus(avg)
+		}
+		fmt.Fprintf(&b, "%s %s %4s  %s\n", s.label,
+			barTrack(avg, 10, 10, st), avgStr, dimStyle.Render(fmt.Sprintf("n=%d", s.count)))
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func (m tuiModel) distSection() string {
+	var b strings.Builder
+	b.WriteString(subHeaderStyle.Render("Distribution"))
+	b.WriteString("\n")
+	labels := [5]string{"1-2 ", "3-4 ", "5-6 ", "7-8 ", "9-10"}
+	mids := [5]float64{1.5, 3.5, 5.5, 7.5, 9.5}
+	top := 0
+	for _, c := range m.focusHist {
+		top = max(top, c)
+	}
+	for i, c := range m.focusHist {
+		fmt.Fprintf(&b, "%s %s %3d\n", labels[i],
+			barTrack(float64(c), float64(top), 10, mutedFocus(mids[i])), c)
+	}
+	return strings.TrimRight(b.String(), "\n")
+}
+
+func (m tuiModel) viewMetrics() string {
+	var b strings.Builder
+
+	// ----- weekly trend -----
+	b.WriteString(headerStyle.Render("=== Weekly trend ==="))
+	b.WriteString("\n")
+	// Each plot is ~8 label columns + 2 columns per day. Side by side if it fits.
+	sideBySide := m.width >= 2*(trendDaysToShow*2+8)+4
+	perDay := 3
+	if sideBySide {
+		perDay = 2
+	}
+	sleepPlot := trendPlot("Sleep (hrs)", m.weeklyTrend.sleepHours, m.weeklyTrend.sleepHas, trendStyle, perDay)
+	focusPlot := trendPlot("Focus (avg)", m.weeklyTrend.focusAvg, m.weeklyTrend.focusHas, trendStyle, perDay)
+	if sideBySide {
+		b.WriteString(lipgloss.JoinHorizontal(lipgloss.Top, sleepPlot, "    ", focusPlot))
 	} else {
-		margin++ // include the axis glyph itself
+		b.WriteString(sleepPlot)
+		b.WriteString("\n\n")
+		b.WriteString(focusPlot)
 	}
-	dayLetters := []string{"M", "T", "W", "T", "F", "S", "S"}
-	days := make([]string, numDays)
-	for i := range days {
-		days[i] = dayLetters[i%7]
+	b.WriteString("\n\n")
+
+	// ----- blocks by project -----
+	b.WriteString(headerStyle.Render("=== Blocks by project (this week) ==="))
+	b.WriteString("\n")
+	if len(m.metrics) == 0 {
+		b.WriteString(dimStyle.Render("No blocks logged this week."))
+		b.WriteString("\n")
+	} else {
+		top := 0
+		for _, mt := range m.metrics {
+			top = max(top, mt.count)
+		}
+		for _, mt := range m.metrics {
+			ps := projectStyle(mt.project)
+			fmt.Fprintf(&b, "  %s %s %s  avg focus %s\n",
+				ps.Render(fmt.Sprintf("%-15s", mt.project)),
+				barTrack(float64(mt.count), float64(top), 10, ps),
+				dimStyle.Render(fmt.Sprintf("%2d", mt.count)),
+				mutedFocus(mt.avgFocus).Render(fmt.Sprintf("%.1f", mt.avgFocus)))
+		}
 	}
-	return strings.Repeat(" ", margin) + strings.Join(days, "   ")
+
+	// ----- correlation -----
+	b.WriteString("\n")
+	b.WriteString(headerStyle.Render("=== Correlation (all-time, paired days) ==="))
+	b.WriteString("\n")
+	if m.correlation.pairedDays < 3 {
+		b.WriteString(dimStyle.Render(fmt.Sprintf("Only %d paired days found. Need at least 3 (ideally 14+).\n", m.correlation.pairedDays)))
+	} else {
+		c := m.correlation
+		gap := "    "
+		b.WriteString(lipgloss.JoinHorizontal(lipgloss.Top,
+			scatterPlot("sleep_hours", c.hours, c.focus, c.rHours), gap,
+			scatterPlot("sleep_quality", c.quality, c.focus, c.rQuality), gap,
+			scatterPlot("feel", c.feel, c.focus, c.rFeel),
+		))
+		b.WriteString("\n")
+		b.WriteString(dimStyle.Render(fmt.Sprintf("y: avg focus per day  •  %d paired days", c.pairedDays)))
+		b.WriteString("\n")
+	}
+
+	// ----- focus stats (three columns) -----
+	b.WriteString("\n")
+	b.WriteString(headerStyle.Render("=== Focus (all-time) ==="))
+	b.WriteString("\n")
+	if m.focusN == 0 {
+		b.WriteString(dimStyle.Render("No closed blocks yet.\n"))
+		return b.String()
+	}
+	col := "      "
+	b.WriteString(lipgloss.JoinHorizontal(lipgloss.Top,
+		m.blockPosSection(), col, m.startTimeSection(), col, m.distSection()))
+	b.WriteString("\n\n")
+	b.WriteString(dimStyle.Render(fmt.Sprintf("median %.0f  •  mean %.1f  •  %d blocks", m.focusMedian, m.focusMean, m.focusN)))
+	b.WriteString("    ")
+	b.WriteString(mutedGoodStyle.Render(fmt.Sprintf("best %s %.1f", m.weekdayBest.day, m.weekdayBest.avg)))
+	b.WriteString("  ")
+	b.WriteString(mutedBadStyle.Render(fmt.Sprintf("worst %s %.1f", m.weekdayWorst.day, m.weekdayWorst.avg)))
+	b.WriteString("\n")
+	return b.String()
 }
 
 // weekGoalStats returns done/total goal counts for a week.
@@ -253,133 +462,6 @@ func loadGoalWeeks(currentWeekStart string, count int) ([]goalsWeek, error) {
 		}
 	}
 	return out, nil
-}
-
-func (m tuiModel) viewMetrics() string {
-	var b strings.Builder
-
-	b.WriteString(headerStyle.Render("=== Weekly trend ==="))
-	b.WriteString("\n")
-	sleepGraph := asciigraph.Plot(
-		toPlotSeries(m.weeklyTrend.sleepHours, m.weeklyTrend.sleepHas),
-		asciigraph.Height(4),
-		asciigraph.Width(trendDaysToShow*3),
-		asciigraph.Caption("Sleep (hrs)"),
-	)
-	b.WriteString(sleepGraph)
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render(weekDayAxis(sleepGraph, trendDaysToShow)))
-	b.WriteString("\n\n")
-
-	focusGraph := asciigraph.Plot(
-		toPlotSeries(m.weeklyTrend.focusAvg, m.weeklyTrend.focusHas),
-		asciigraph.Height(4),
-		asciigraph.Width(trendDaysToShow*3),
-		asciigraph.Caption("Focus (avg)"),
-	)
-	b.WriteString(focusGraph)
-	b.WriteString("\n")
-	b.WriteString(dimStyle.Render(weekDayAxis(focusGraph, trendDaysToShow)))
-	b.WriteString("\n")
-
-	b.WriteString("\n")
-
-	b.WriteString(headerStyle.Render("=== Blocks by project (this week) ==="))
-	b.WriteString("\n")
-
-	if len(m.metrics) == 0 {
-		b.WriteString(dimStyle.Render("No blocks logged this week."))
-	} else {
-		for _, mt := range m.metrics {
-			name := projectStyle(mt.project).Render(fmt.Sprintf("%-15s", mt.project))
-			fmt.Fprintf(&b, "  %s blocks:%-3d avg focus:%.1f\n", name, mt.count, mt.avgFocus)
-		}
-	}
-
-	b.WriteString("\n")
-	b.WriteString(headerStyle.Render("=== Correlation (all-time, paired days) ==="))
-	b.WriteString("\n")
-	if m.correlation.pairedDays < 3 {
-		b.WriteString(dimStyle.Render(fmt.Sprintf("Only %d paired days found. Need at least 3 (ideally 14+).\n", m.correlation.pairedDays)))
-	} else {
-		c := m.correlation
-		rows := []struct {
-			label string
-			r     float64
-		}{
-			{"sleep_hours", c.rHours},
-			{"sleep_quality", c.rQuality},
-			{"feel", c.rFeel},
-		}
-		ct := table.New().
-			Border(lipgloss.HiddenBorder()).
-			StyleFunc(func(row, col int) lipgloss.Style {
-				if col == 2 {
-					return rStyle(rows[row].r)
-				}
-				return tableCellStyle
-			})
-		for _, row := range rows {
-			ct.Row(row.label, "<-> focus", rValueStr(row.r), scaledBar(math.Abs(row.r), 1.0, 10))
-		}
-		b.WriteString(ct.Render())
-		b.WriteString("\n")
-	}
-	b.WriteString("\n")
-	b.WriteString(headerStyle.Render("=== Focus by block position (all-time) ==="))
-	b.WriteString("\n")
-	if len(m.blockPosStats) == 0 {
-		b.WriteString(dimStyle.Render("No closed blocks yet.\n"))
-	} else {
-		for _, s := range m.blockPosStats {
-			fmt.Fprintf(&b, "#%-3d %-8s %.1f   (%d blocks)\n",
-				s.num, scaledBar(s.avg, 10, 7), s.avg, s.count)
-		}
-		fmt.Fprintf(&b, "\nBest weekday: %-4s avg %.1f\n", m.weekdayBest.day, m.weekdayBest.avg)
-		fmt.Fprintf(&b, "Worst weekday: %-4s avg %.1f\n", m.weekdayWorst.day, m.weekdayWorst.avg)
-	}
-
-	b.WriteString(headerStyle.Render("=== Focus by start time (all-time) ==="))
-	b.WriteString("\n")
-	anyStartTime := false
-	for _, s := range m.startTimeStats {
-		if s.count > 0 {
-			anyStartTime = true
-			break
-		}
-	}
-	if !anyStartTime {
-		b.WriteString(dimStyle.Render("No closed blocks yet.\n"))
-	} else {
-		for _, s := range m.startTimeStats {
-			if s.count == 0 {
-				fmt.Fprintf(&b, "%s %-8s  -    (0 blocks)\n", s.label, "")
-				continue
-			}
-			avg := s.sum / float64(s.count)
-			fmt.Fprintf(&b, "%s %-8s %.1f   (%d blocks)\n", s.label, scaledBar(avg, 10, 7), avg, s.count)
-		}
-	}
-
-	b.WriteString("\n")
-	b.WriteString(headerStyle.Render("=== Focus distribution (all-time) ==="))
-	b.WriteString("\n")
-	if m.focusN == 0 {
-		b.WriteString(dimStyle.Render("No closed blocks yet.\n"))
-	} else {
-		labels := [5]string{" 1-2 ", " 3-4 ", " 5-6 ", " 7-8 ", "9-10 "}
-		maxCount := 0
-		for _, c := range m.focusHist {
-			if c > maxCount {
-				maxCount = c
-			}
-		}
-		for i, c := range m.focusHist {
-			fmt.Fprintf(&b, "%s %-12s %d\n", labels[i], scaledBar(float64(c), float64(maxCount), 12), c)
-		}
-		fmt.Fprintf(&b, "\nmedian: %.0f   mean: %.1f   (%d blocks)\n", m.focusMedian, m.focusMean, m.focusN)
-	}
-	return b.String()
 }
 
 // viewForm renders whatever form is currently active (new/update block,
@@ -623,29 +705,111 @@ func (m tuiModel) viewBlockDetail() string {
 	}
 	row("Focus quality", focus)
 	row("Tweak", d.tweak)
-	status := statusStyle("OPEN").Render("OPEN")
-	if d.closedAt != nil {
-		closedDisplay := *d.closedAt
-		if ct, err := util.ParseTimestamp(*d.closedAt); err == nil {
-			closedDisplay = ct.Format("2006-01-02 15:04")
-		}
-		status = statusStyle("CLOSED").Render("CLOSED") + " at " + closedDisplay
+	// One dim summary line: created → closed · duration
+	created := d.createdAt
+	var createdT time.Time
+	createdOK := false
+	if ct, err := util.ParseTimestamp(d.createdAt); err == nil {
+		created = ct.Format("2006-01-02 15:04")
+		createdT, createdOK = ct, true
 	}
-	row("Status", status)
-	durationStr := "-"
+	line := created + " → open"
 	if d.closedAt != nil {
-		if ct, err1 := util.ParseTimestamp(d.createdAt); err1 == nil {
-			if ct2, err2 := util.ParseTimestamp(*d.closedAt); err2 == nil {
-				durationStr = util.FormatDuration(ct2.Sub(ct))
+		closed, dur := *d.closedAt, ""
+		if ct2, err := util.ParseTimestamp(*d.closedAt); err == nil {
+			closed = ct2.Format("15:04")
+			if createdOK {
+				dur = " · " + util.FormatDuration(ct2.Sub(createdT))
 			}
 		}
+		line = created + " → " + closed + dur
 	}
-	row("Duration", durationStr)
-	createdDisplay := d.createdAt
-	if ct, err := util.ParseTimestamp(d.createdAt); err == nil {
-		createdDisplay = ct.Format("2006-01-02 15:04")
-	}
-	row("Created", createdDisplay)
+	b.WriteString("\n")
+	b.WriteString(dimStyle.Render(line))
+	b.WriteString("\n")
 
+	return b.String()
+}
+
+// ---- plot correlation using scatter ----
+const (
+	scatterW = 20
+	scatterH = 8
+)
+
+func rColor(r float64) lipgloss.Color {
+	switch abs := math.Abs(r); {
+	case abs > 0.6:
+		return colGreen
+	case abs >= 0.3:
+		return colGold
+	default:
+		return colMuted
+	}
+}
+
+func dataBounds(v []float64) (lo, hi float64) {
+	lo, hi = v[0], v[0]
+	for _, x := range v {
+		lo = min(lo, x)
+		hi = max(hi, x)
+	}
+	if hi-lo < 1e-9 {
+		lo -= 0.5
+		hi += 0.5
+	}
+	return
+}
+
+// scatterPlot draws xs (horizontal) against ys (vertical) on a character grid.
+// Cells with one point show •, cells with several show ●.
+func scatterPlot(name string, xs, ys []float64, r float64) string {
+	minX, maxX := dataBounds(xs)
+	minY, maxY := dataBounds(ys)
+
+	grid := make([][]int, scatterH)
+	for i := range grid {
+		grid[i] = make([]int, scatterW)
+	}
+	for i := range xs {
+		col := int(math.Round((xs[i] - minX) / (maxX - minX) * float64(scatterW-1)))
+		row := scatterH - 1 - int(math.Round((ys[i]-minY)/(maxY-minY)*float64(scatterH-1)))
+		grid[row][col]++
+	}
+
+	pt := lipgloss.NewStyle().Foreground(rColor(r))
+	var b strings.Builder
+	const scatterIndent = 7
+	title := fmt.Sprintf("%s  r=%5.2f", name, r)
+	pad := max((scatterW-len(title))/2, 0)
+	b.WriteString(strings.Repeat(" ", scatterIndent+pad))
+	b.WriteString(pt.Bold(true).Render(title))
+	b.WriteString("\n")
+	for row := 0; row < scatterH; row++ {
+		label := "     "
+		switch row {
+		case 0:
+			label = fmt.Sprintf("%5.1f", maxY)
+		case scatterH - 1:
+			label = fmt.Sprintf("%5.1f", minY)
+		}
+		b.WriteString(dimStyle.Render(label + " │"))
+		for col := 0; col < scatterW; col++ {
+			switch n := grid[row][col]; {
+			case n == 1:
+				b.WriteString(pt.Render("•"))
+			case n > 1:
+				b.WriteString(pt.Render("●"))
+			default:
+				b.WriteString(" ")
+			}
+		}
+		b.WriteString("\n")
+	}
+	b.WriteString(dimStyle.Render("      └" + strings.Repeat("─", scatterW)))
+	b.WriteString("\n")
+	lo, hi := fmt.Sprintf("%.1f", minX), fmt.Sprintf("%.1f", maxX)
+	gap := max(scatterW-len(lo)-len(hi), 1)
+	b.WriteString(dimStyle.Render("       " + lo + strings.Repeat(" ", gap) + hi))
 	return b.String()
 }

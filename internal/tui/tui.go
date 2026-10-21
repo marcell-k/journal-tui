@@ -53,42 +53,60 @@ func hasNotes(projectID int) bool {
 }
 
 // ---------- styles ----------
+const (
+	// accents
+	colGold = lipgloss.Color("#e6c384") // primary: headers, cursor, selection, active tab
+	colBlue = lipgloss.Color("#8ba4b0") // secondary: banners, sub-headers, trends, deep blocks
 
-var (
-	activeTabStyle   = lipgloss.NewStyle().Padding(0, 2).Bold(true).Foreground(lipgloss.Color("#e6c384")).Underline(true)
-	inactiveTabStyle = lipgloss.NewStyle().Padding(0, 2).Foreground(lipgloss.Color("#a6a69c"))
-	headerStyle      = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#e6c384"))
-	tableHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#e6c384")).Padding(0, 1)
-	tableCellStyle   = lipgloss.NewStyle().Padding(0, 1)
-	tableBorderStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#4a4a45"))
-	rowSelectedStyle = lipgloss.NewStyle().Padding(0, 1).Bold(true).Foreground(lipgloss.Color("#e6c384"))
-	focusHighStyle   = lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.Color("#87a987"))
-	focusMidStyle    = lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.Color("#e6c384"))
-	focusLowStyle    = lipgloss.NewStyle().Padding(0, 1).Foreground(lipgloss.Color("#e46876"))
-	nextStepStyle    = lipgloss.NewStyle().Italic(true).Foreground(lipgloss.Color("#6b6b64"))
+	// text and lines
+	colText   = lipgloss.Color("#c9c9c1")
+	colMuted  = lipgloss.Color("#a6a69c") // dim text, inactive tabs
+	colFaint  = lipgloss.Color("#6b6b64")
+	colBorder = lipgloss.Color("#4a4a45")
 
-	deepTypeStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#7fb4ca"))
-	shallowTypeStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#e6c384"))
+	// status (bright)
+	colRed   = lipgloss.Color("#e46876") // error, overrun
+	colGreen = lipgloss.Color("#87a987") // ok, open
 
-	bannerStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#7fb4ca")).
-			Border(lipgloss.RoundedBorder()).Padding(0, 1).MarginTop(1).MarginBottom(1)
-	cursorStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("#e6c384"))
-	dimStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#a6a69c"))
-	errStyle    = lipgloss.NewStyle().Foreground(lipgloss.Color("#e46876"))
-	okStyle     = lipgloss.NewStyle().Foreground(lipgloss.Color("#87a987"))
+	// soft variants for charts and ratings
+	colSoftRed   = lipgloss.Color("#c4746e")
+	colSoftGreen = lipgloss.Color("#8a9a7b")
+	colSoftGold  = lipgloss.Color("#c4b28a")
+
+	// project-only colors
+	colMauve = lipgloss.Color("#a292a3")
+	colSky   = lipgloss.Color("#7fb4ca")
 )
 
-// ---------- per-project colors ----------
+var (
+	activeTabStyle   = lipgloss.NewStyle().Padding(0, 2).Bold(true).Foreground(colGold).Underline(true)
+	inactiveTabStyle = lipgloss.NewStyle().Padding(0, 2).Foreground(colMuted)
+	headerStyle      = lipgloss.NewStyle().Bold(true).Foreground(colGold)
+	tableHeaderStyle = lipgloss.NewStyle().Bold(true).Foreground(colGold).Padding(0, 1)
+	tableCellStyle   = lipgloss.NewStyle().Padding(0, 1)
+	tableBorderStyle = lipgloss.NewStyle().Foreground(colBorder)
+	rowSelectedStyle = lipgloss.NewStyle().Padding(0, 1).Bold(true).Foreground(colGold)
+	focusHighStyle   = lipgloss.NewStyle().Padding(0, 1).Foreground(colGreen)
+	focusMidStyle    = lipgloss.NewStyle().Padding(0, 1).Foreground(colGold)
+	focusLowStyle    = lipgloss.NewStyle().Padding(0, 1).Foreground(colRed)
+	nextStepStyle    = lipgloss.NewStyle().Italic(true).Foreground(colFaint)
 
+	deepTypeStyle    = lipgloss.NewStyle().Foreground(colBlue)
+	shallowTypeStyle = lipgloss.NewStyle().Foreground(colGold)
+
+	bannerStyle = lipgloss.NewStyle().Bold(true).Foreground(colBlue).
+			Border(lipgloss.RoundedBorder()).Padding(0, 1).MarginTop(1).MarginBottom(1)
+	cursorStyle = lipgloss.NewStyle().Foreground(colGold)
+	dimStyle    = lipgloss.NewStyle().Foreground(colMuted)
+	errStyle    = lipgloss.NewStyle().Foreground(colRed)
+	okStyle     = lipgloss.NewStyle().Foreground(colGreen)
+)
 var projectPalette = []lipgloss.Color{
-	"#c4746e", // 1  muted red
-	"#8a9a7b", // 2  muted green
-	"#c4b28a", // 3  sand
-	"#8ba4b0", // 4  steel blue
-	"#a292a3", // 5  mauve
-	"#8ea4a2", // 6  grey teal
-	"#7fb4ca", // 12 bright blue
-	"#938aa9", // 13 violet
+	colSoftRed,
+	colSoftGreen,
+	colSoftGold,
+	colSky,
+	colMauve,
 }
 
 func projectStyle(name string) lipgloss.Style {
@@ -103,7 +121,7 @@ func projectStyle(name string) lipgloss.Style {
 // ---------- block-type ----------
 func typeGlyph(blockType string) string {
 	if blockType == "shallow" {
-		return shallowTypeStyle.Render("●")
+		return shallowTypeStyle.Render("◐")
 	}
 	return deepTypeStyle.Render("●")
 }
@@ -118,7 +136,7 @@ type openBlockInfo struct {
 }
 
 var (
-	headerBarStyle = lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color("#c9c9c1")).MarginBottom(1)
+	headerBarStyle = lipgloss.NewStyle().Bold(true).Foreground(colText).MarginBottom(1)
 	blockLenMins   = 90
 )
 var displayLoc = func() *time.Location {

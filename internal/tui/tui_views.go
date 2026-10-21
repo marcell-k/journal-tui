@@ -146,7 +146,7 @@ func focusStyle(n float64) lipgloss.Style {
 
 const clampColWidth = 15
 
-var outcomeColWidth = int(float64(clampColWidth) * 1.2)
+var outcomeColWidth = 25 // int(float64(clampColWidth) * 1.2)
 
 func dateOnly(s string) string {
 	if len(s) >= 10 {
@@ -157,8 +157,6 @@ func dateOnly(s string) string {
 
 func (m tuiModel) viewBlocks() string {
 	var b strings.Builder
-	b.WriteString(headerStyle.Render("=== Blocks (this week) ==="))
-	b.WriteString("\n")
 
 	if len(m.blocks) == 0 {
 		b.WriteString(dimStyle.Render("No blocks logged this week."))
@@ -168,10 +166,10 @@ func (m tuiModel) viewBlocks() string {
 	t := table.New().
 		Border(lipgloss.RoundedBorder()).
 		BorderStyle(tableBorderStyle).
-		Headers("#", "Date", "Type", "Status", "Project", "Length", "Focus", "Outcome").
+		Headers("#", "Date", "Type", "Project", "Length", "Focus", "Outcome").
 		StyleFunc(func(row, col int) lipgloss.Style {
 			if row == table.HeaderRow {
-				if col == 5 || col == 6 { // Length, Focus
+				if col == 4 || col == 5 { // Length, Focus
 					return tableHeaderStyle.Align(lipgloss.Right)
 				}
 				return tableHeaderStyle
@@ -184,26 +182,20 @@ func (m tuiModel) viewBlocks() string {
 					return rowSelectedStyle.Align(lipgloss.Center)
 				}
 				return tableCellStyle.Align(lipgloss.Center)
-			case 3: // Status
-				if selected {
-					return rowSelectedStyle.Align(lipgloss.Center)
-				}
-				status := "DONE"
-				if !blk.closed {
-					status = "OPEN"
-				}
-				return statusStyle(status).Padding(0, 1).Align(lipgloss.Center)
-			case 4: // Project
+			case 3: // Project
 				if selected {
 					return rowSelectedStyle
 				}
 				return projectStyle(blk.project).Padding(0, 1)
-			case 5: // Length
+			case 4: // Length
 				if selected {
 					return rowSelectedStyle.Align(lipgloss.Right)
 				}
+				if !blk.closed { // open block: green length replaces the Status column
+					return okStyle.Padding(0, 1).Align(lipgloss.Right)
+				}
 				return tableCellStyle.Align(lipgloss.Right)
-			case 6: // Focus
+			case 5: // Focus
 				if selected {
 					return rowSelectedStyle.Align(lipgloss.Right)
 				}
@@ -225,15 +217,11 @@ func (m tuiModel) viewBlocks() string {
 			marker = "▶"
 		}
 		idStr := fmt.Sprintf("%s%*d", marker, 3, blk.blockNum)
-		status := "DONE"
-		if !blk.closed {
-			status = "OPEN"
-		}
 		focus := "-"
 		if blk.focus != nil {
 			focus = formatFocus(*blk.focus)
 		}
-		t.Row(idStr, dateOnly(blk.date), typeGlyph(blk.blockType), truncate(status, clampColWidth), truncate(blk.project, clampColWidth), truncate(blk.length, clampColWidth), truncate(focus, clampColWidth), truncate(blk.outcome, outcomeColWidth))
+		t.Row(idStr, dateOnly(blk.date), typeGlyph(blk.blockType), truncate(blk.project, clampColWidth), truncate(blk.length, clampColWidth), truncate(focus, clampColWidth), truncate(blk.outcome, outcomeColWidth))
 	}
 
 	b.WriteString(t.Render())
@@ -331,8 +319,6 @@ func (m tuiModel) viewGoals() string {
 
 func (m tuiModel) viewSleep() string {
 	var b strings.Builder
-	b.WriteString(headerStyle.Render("=== Wellness (this week) ==="))
-	b.WriteString("\n")
 
 	if len(m.sleep) == 0 {
 		b.WriteString(dimStyle.Render("No checkins logged this week — press n to add one."))

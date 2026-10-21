@@ -244,10 +244,10 @@ func loadTUIBlocks(weekStart string) ([]tuiBlock, error) {
 		if ct, err := util.ParseTimestamp(createdAt); err == nil {
 			if closedAt != nil {
 				if ct2, err2 := util.ParseTimestamp(*closedAt); err2 == nil {
-					b.length = util.FormatDuration(ct2.Sub(ct))
+					b.length = util.FormatDurationHM(ct2.Sub(ct))
 				}
 			} else {
-				b.length = util.FormatDuration(time.Since(ct))
+				b.length = util.FormatDurationHM(time.Since(ct))
 			}
 		}
 		out = append(out, b)

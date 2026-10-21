@@ -30,6 +30,12 @@ func FormatDuration(d time.Duration) string {
 	}
 	return fmt.Sprintf("%dm", m)
 }
+func FormatDurationHM(d time.Duration) string {
+	if d < 0 {
+		d = -d
+	}
+	return fmt.Sprintf("%dh %02dm", int(d.Hours()), int(d.Minutes())%60)
+}
 
 func NullOr(v sql.NullString) string {
 	if v.Valid && v.String != "" {
