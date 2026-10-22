@@ -166,6 +166,8 @@ type tuiBlock struct {
 	focus        *float64
 	length       string
 	closed       bool
+	startedAt    time.Time
+	duration     time.Duration
 }
 
 type tuiGoal struct {
@@ -282,6 +284,7 @@ var (
 	blockLogFieldLabels      = []string{"Outcome", "Description", "Hours"}
 	shallowUpdateFieldLabels = []string{"Outcome", "Description"}
 	sleepFieldLabels         = []string{"Hours", "Quality (1-10)", "Feel (1-10)", "Water (L)", "Day"}
+	sleepUpdateFieldLabels   = []string{"Water (L)", "Hours", "Quality (1-10)", "Feel (1-10)", "Day"}
 	goalAddFieldLabels       = []string{"Goal", "Day"}
 	goalEditFieldLabels      = []string{"Goal"}
 	projectAddFieldLabels    = []string{"Name"}

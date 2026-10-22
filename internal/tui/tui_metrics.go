@@ -652,7 +652,7 @@ func loadStartTimeStats() ([]tuiStartTimeStat, error) {
 				continue
 			}
 		}
-		hour := t.Hour()
+		hour := t.In(displayLoc).Hour()
 		for i, bucket := range startTimeBuckets {
 			if hour >= bucket.start && hour < bucket.end {
 				sums[i] += focus

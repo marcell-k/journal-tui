@@ -119,7 +119,7 @@ func (m tuiModel) helpLine() string {
 	}
 	switch m.tab {
 	case tabBlocks:
-		return "ctrl+n/b: switch section  •  ↑↓/jk: move  •  enter: view block  •  n: new  •  s: log shallow  •  u: update  •  c: close  •  d: delete  •  r: reload  •  q: quit"
+		return "ctrl+n/b: switch section  •  ↑↓/jk: move  •  enter: view block  •  n: new  •  s: log shallow  •  u: update  •  c: close  •  d: delete  •  f: filter project  •  r: reload  •  q: quit"
 	case tabGoals:
 		return "ctrl+n/b: switch section  •  ↑↓/jk: move  •  ctrl+j/k: reorder  •  n: new  •  u: update  •  d: delete  •  enter/space: toggle done  •  r: reload  •  q: quit"
 	case tabSleep:
@@ -157,6 +157,10 @@ func dateOnly(s string) string {
 
 func (m tuiModel) viewBlocks() string {
 	var b strings.Builder
+	if m.blockFilter != "" {
+		b.WriteString(dimStyle.Render("filter: " + m.blockFilter + "  (f: next project)"))
+		b.WriteString("\n")
+	}
 
 	if len(m.blocks) == 0 {
 		b.WriteString(dimStyle.Render("No blocks logged this week."))
@@ -166,10 +170,10 @@ func (m tuiModel) viewBlocks() string {
 	t := table.New().
 		Border(lipgloss.RoundedBorder()).
 		BorderStyle(tableBorderStyle).
-		Headers(fmt.Sprintf("  %-10s %2s", "Date", "#"), "Type", "Project", "Length", "Focus", "Outcome").
+		Headers(fmt.Sprintf("  %-10s %2s", "Date", "#"), "Start", "Type", "Project", "Length", "Focus", "Outcome").
 		StyleFunc(func(row, col int) lipgloss.Style {
 			if row == table.HeaderRow {
-				if col == 3 || col == 4 { // Length, Focus
+				if col == 4 || col == 5 { // Length, Focus
 					return tableHeaderStyle.Align(lipgloss.Right)
 				}
 				return tableHeaderStyle
@@ -177,17 +181,17 @@ func (m tuiModel) viewBlocks() string {
 			blk := m.blocks[row]
 			selected := row == m.blockCur
 			switch col {
-			case 1: // Type
+			case 2: // Type
 				if selected {
 					return rowSelectedStyle.Align(lipgloss.Center)
 				}
 				return tableCellStyle.Align(lipgloss.Center)
-			case 2: // Project
+			case 3: // Project
 				if selected {
 					return rowSelectedStyle
 				}
 				return projectStyle(blk.project).Padding(0, 1)
-			case 3: // Length
+			case 4: // Length
 				if selected {
 					return rowSelectedStyle.Align(lipgloss.Right)
 				}
@@ -195,7 +199,7 @@ func (m tuiModel) viewBlocks() string {
 					return okStyle.Padding(0, 1).Align(lipgloss.Right)
 				}
 				return tableCellStyle.Align(lipgloss.Right)
-			case 4: // Focus
+			case 5: // Focus
 				if selected {
 					return rowSelectedStyle.Align(lipgloss.Right)
 				}
@@ -226,12 +230,52 @@ func (m tuiModel) viewBlocks() string {
 		if blk.focus != nil {
 			focus = formatFocus(*blk.focus)
 		}
-		t.Row(dateNum, typeGlyph(blk.blockType), truncate(blk.project, clampColWidth), truncate(blk.length, clampColWidth), truncate(focus, clampColWidth), truncate(blk.outcome, outcomeColWidth))
+		// Open blocks: compute the length now, so the 5s tick keeps it live.
+		length := blk.length
+		if !blk.closed {
+			length = util.FormatDurationHM(time.Since(blk.startedAt))
+		}
+		t.Row(dateNum, blk.startedAt.Format("15:04"), typeGlyph(blk.blockType), truncate(blk.project, clampColWidth), truncate(length, clampColWidth), truncate(focus, clampColWidth), truncate(blk.outcome, outcomeColWidth))
 	}
 
 	b.WriteString(t.Render())
 	b.WriteString("\n")
+	b.WriteString(dimStyle.Render(m.blocksFooter()))
+	b.WriteString("\n")
 	return b.String()
+}
+
+// blocksFooter summarises the current week (respecting the project filter).
+func (m tuiModel) blocksFooter() string {
+	weekStart := util.MondayOf(time.Now().In(displayLoc)).Format("2006-01-02")
+	var n, focusN int
+	var deep, shallow time.Duration
+	var focusSum float64
+	for _, blk := range m.blocks {
+		if dateOnly(blk.date) < weekStart {
+			continue
+		}
+		n++
+		d := blk.duration
+		if !blk.closed {
+			d = time.Since(blk.startedAt)
+		}
+		if blk.blockType == "shallow" {
+			shallow += d
+		} else {
+			deep += d
+		}
+		if blk.focus != nil {
+			focusSum += *blk.focus
+			focusN++
+		}
+	}
+	avg := "-"
+	if focusN > 0 {
+		avg = fmt.Sprintf("%.1f", focusSum/float64(focusN))
+	}
+	return fmt.Sprintf("this week: %d blocks  •  deep %s  •  shallow %s  •  avg focus %s",
+		n, util.FormatDurationHM(deep), util.FormatDurationHM(shallow), avg)
 }
 
 func formatFocus(f float64) string {
@@ -254,8 +298,6 @@ func truncate(s string, n int) string {
 
 func (m tuiModel) viewGoals() string {
 	var b strings.Builder
-	b.WriteString(headerStyle.Render("=== Weekly Goals ==="))
-	b.WriteString("\n")
 
 	if len(m.goalWeeks) == 0 {
 		b.WriteString(dimStyle.Render("No goals yet — press n to add one."))

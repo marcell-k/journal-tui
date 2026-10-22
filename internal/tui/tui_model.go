@@ -9,8 +9,9 @@ import (
 type tuiModel struct {
 	tab int
 
-	blocks   []tuiBlock
-	blockCur int
+	blocks      []tuiBlock
+	blockCur    int
+	blockFilter string
 
 	goalWeeks        []goalsWeek
 	goalWeekExpanded int
@@ -69,7 +70,7 @@ func (m *tuiModel) reload() error {
 	weekStart := util.MondayOf(time.Now().In(displayLoc)).Format("2006-01-02")
 	rangeStart := util.MondayOf(time.Now().In(displayLoc)).AddDate(0, 0, -7*(weeksToShow-1)).Format("2006-01-02")
 
-	blocks, err := loadTUIBlocks(rangeStart)
+	blocks, err := loadTUIBlocks(rangeStart, m.blockFilter)
 	if err != nil {
 		return err
 	}
@@ -212,12 +213,12 @@ func loadOpenBlock() (*openBlockInfo, error) {
 	return &ob, nil
 }
 
-func loadTUIBlocks(weekStart string) ([]tuiBlock, error) {
+func loadTUIBlocks(weekStart, project string) ([]tuiBlock, error) {
 	rows, err := tuiDB.Query(`
 		SELECT b.id, b.date, b.block_num, b.day, p.name, b.outcome, b.block_type, b.focus_quality, b.created_at, b.closed_at
 		FROM blocks b LEFT JOIN projects p ON p.id = b.project_id
-		WHERE b.date >= ?
-		ORDER BY b.date DESC, b.block_num DESC`, weekStart)
+		WHERE b.date >= ? AND (? = '' OR p.name = ?)
+		ORDER BY b.date DESC, b.block_num DESC`, weekStart, project, project)
 	if err != nil {
 		return nil, err
 	}
@@ -242,12 +243,12 @@ func loadTUIBlocks(weekStart string) ([]tuiBlock, error) {
 		b.closed = closedAt != nil
 		b.length = "-"
 		if ct, err := util.ParseTimestamp(createdAt); err == nil {
+			b.startedAt = ct.In(displayLoc)
 			if closedAt != nil {
 				if ct2, err2 := util.ParseTimestamp(*closedAt); err2 == nil {
-					b.length = util.FormatDurationHM(ct2.Sub(ct))
+					b.duration = ct2.Sub(ct)
+					b.length = util.FormatDurationHM(b.duration)
 				}
-			} else {
-				b.length = util.FormatDurationHM(time.Since(ct))
 			}
 		}
 		out = append(out, b)

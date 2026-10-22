@@ -233,16 +233,16 @@ func (m tuiModel) updateBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 			s := m.sleep[m.sleepCur]
 			m.mode = "form"
-			m.formPurpose = "sleep_save"
+			m.formPurpose = "sleep_update"
 			waterStr := ""
 			if s.hasWater {
 				waterStr = strconv.FormatFloat(s.water, 'f', -1, 64)
 			}
-			m.f = newForm("Update sleep checkin", sleepFieldLabels, []string{
+			m.f = newForm("Update sleep checkin", sleepUpdateFieldLabels, []string{
+				waterStr,
 				strconv.FormatFloat(s.hours, 'f', -1, 64),
 				strconv.FormatFloat(s.quality, 'f', -1, 64),
 				strconv.FormatFloat(s.feel, 'f', -1, 64),
-				waterStr,
 				s.date,
 			})
 		case tabProjects:
@@ -255,6 +255,23 @@ func (m tuiModel) updateBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.f = newForm(fmt.Sprintf("Renaming project %q", p.name), projectRenameFieldLabels, []string{p.name})
 			m.f.ctxID = p.id
 			m.f.ctxLabel = p.name
+		}
+		return m, nil
+
+	case "f":
+		if m.tab == tabBlocks {
+			m.blockFilter = nextProjectFilter(m.blockFilter, m.projects)
+			if err := m.reload(); err != nil {
+				m.err = err
+			} else {
+				m.err = nil
+				m.blockCur = 0
+				if m.blockFilter == "" {
+					m.status = "Filter: all projects"
+				} else {
+					m.status = "Filter: " + m.blockFilter
+				}
+			}
 		}
 		return m, nil
 
@@ -374,6 +391,25 @@ func (m tuiModel) updateBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	return m, nil
 }
+
+func nextProjectFilter(cur string, projects []tuiProject) string {
+	if cur == "" {
+		if len(projects) == 0 {
+			return ""
+		}
+		return projects[0].name
+	}
+	for i, p := range projects {
+		if p.name == cur {
+			if i+1 < len(projects) {
+				return projects[i+1].name
+			}
+			return ""
+		}
+	}
+	return ""
+}
+
 func valOrEmpty(s string) string {
 	if s == "-" {
 		return ""
@@ -414,7 +450,7 @@ func (m tuiModel) submitForm() (tea.Model, tea.Cmd) {
 		return m.submitGoalAdd()
 	case "goal_edit":
 		return m.submitGoalEdit()
-	case "sleep_save":
+	case "sleep_save", "sleep_update":
 		return m.submitSleepSave()
 	case "project_add":
 		return m.submitProjectAdd()
@@ -762,11 +798,15 @@ func (m tuiModel) submitGoalEdit() (tea.Model, tea.Cmd) {
 }
 
 func (m tuiModel) submitSleepSave() (tea.Model, tea.Cmd) {
-	hoursRaw := strings.TrimSpace(m.f.values[0])
-	qualityRaw := strings.TrimSpace(m.f.values[1])
-	feelRaw := strings.TrimSpace(m.f.values[2])
-	waterRaw := strings.TrimSpace(m.f.values[3])
-	dayRaw := strings.TrimSpace(m.f.values[4])
+	hi, qi, fi, wi, di := 0, 1, 2, 3, 4
+	if m.formPurpose == "sleep_update" {
+		wi, hi, qi, fi, di = 0, 1, 2, 3, 4
+	}
+	hoursRaw := strings.TrimSpace(m.f.values[hi])
+	qualityRaw := strings.TrimSpace(m.f.values[qi])
+	feelRaw := strings.TrimSpace(m.f.values[fi])
+	waterRaw := strings.TrimSpace(m.f.values[wi])
+	dayRaw := strings.TrimSpace(m.f.values[di])
 
 	day := time.Now().In(displayLoc).Format("2006-01-02")
 	if dayRaw != "" {
