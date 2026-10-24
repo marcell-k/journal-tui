@@ -137,6 +137,10 @@ func (m tuiModel) updateBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "n":
 		switch m.tab {
 		case tabBlocks:
+			if err := m.reload(); err != nil {
+				m.err = err
+				return m, nil
+			}
 			if len(m.projects) == 0 {
 				m.status = "No projects yet — switch to the Projects tab and press n to add one."
 				return m, nil
@@ -171,6 +175,10 @@ func (m tuiModel) updateBrowse(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// s: log shallow work — retroactive, already-closed block. Blocks tab only.
 	case "s":
 		if m.tab == tabBlocks {
+			if err := m.reload(); err != nil {
+				m.err = err
+				return m, nil
+			}
 			if len(m.projects) == 0 {
 				m.status = "No projects yet — switch to the Projects tab and press n to add one."
 				return m, nil
